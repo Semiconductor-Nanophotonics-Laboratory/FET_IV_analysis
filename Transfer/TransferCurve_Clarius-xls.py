@@ -30,60 +30,58 @@
 
 ###########################      user input      ############################       
 
-DATA_FILE = 'TC_example2.xls'  # Path to the data file
+DATA_FILE: str = 'TC_example2.xls'  # Path to the data file
 
-SERIES_NAME = 'IGZO_project1'  # Name of the series for saving results
+SERIES_NAME: str = 'IGZO_project1'  # Name of the series for saving results
 
-DEVICE_TYPE = 'n'  # 'n' for n-type FETs, 'p' for p-type FETs
+DEVICE_TYPE: str = 'n'  # 'n' for n-type FETs, 'p' for p-type FETs
 
-CONDITION_DATA = False  # Set to True if using a conditions file
+CONDITION_DATA: bool = False  # Set to True if using a conditions file
 if CONDITION_DATA:
-    CONDITION_FILE = 'Conditions.xls'  # Path to the conditions file
+    CONDITION_FILE: str = 'Conditions.xls'  # Path to the conditions file
 else:
-    CH_WIDTH = 1  # Size of Channel (um)
-    CH_LENGTH = 1  # Size of Channel (um)
-    GI_THICK = 0.09  # Thickness of gate insulator (um)
+    CH_WIDTH: int = 1  # Size of Channel (um)
+    CH_LENGTH: int = 1  # Size of Channel (um)
+    GI_THICK: float = 0.09  # Thickness of gate insulator (um)
 
-GI_EPS_R = 3.9  # Relative permittivity (3.9 for SiO2)
+GI_EPS_R: float = 3.9  # Relative permittivity (3.9 for SiO2)
 
-ID_AT_VTH = 1e-8  # A  # Drain current threshold for Vth calculation
-LINEAR_WINDOW_FOR_VTH = 5  # V  # Window size for linear region in Vth calculation
-PLOTTING = True  # Set to True to plot transfer curves
+ID_AT_VTH: float = 1e-8  # A  # Drain current threshold for Vth calculation
+LINEAR_WINDOW_FOR_VTH: int = 5  # V  # Window size for linear region in Vth calculation
+PLOTTING: bool = True  # Set to True to plot transfer curves
 
 if PLOTTING:
-    APPLY_ABSOLUTE = True  # Use absolute values for current in plots
-    MANUAL_PLOT = False  # Set to True for manual plot
+    APPLY_ABSOLUTE: bool = True  # Use absolute values for current in plots
+    MANUAL_PLOT: bool = False  # Set to True for manual plot
     if MANUAL_PLOT:
-        VG_MIN = -20  # Minimum gate voltage for manual plot
-        VG_MAX = +20  # Maximum gate voltage for manual plot
-        ID_MIN = 1e-12  # Minimum drain current for manual plot
-        ID_MAX = 1e-3  # Maximum drain current for manual plot
-        FIGURE_SIZE_H = 8  # Horizontal size of the figure
-        FIGURE_SIZE_V = 6  # Vertical size of the figure
+        VG_MIN: int = -20  # Minimum gate voltage for manual plot
+        VG_MAX: int = +20  # Maximum gate voltage for manual plot
+        ID_MIN: float = 1e-12  # Minimum drain current for manual plot
+        ID_MAX: float = 1e-3  # Maximum drain current for manual plot
+        FIGURE_SIZE_H: int = 8  # Horizontal size of the figure
+        FIGURE_SIZE_V: int = 6  # Vertical size of the figure
 
-ANALYZE_PARAMETERS = True  # Set to True to analyze Vth, SS, and mobility
+ANALYZE_PARAMETERS: bool = True  # Set to True to analyze Vth, SS, and mobility
 
 ############# Specified control !!! (change ONLY IF you know what you are doing) !!! #############
 if ANALYZE_PARAMETERS:
-    ANALYZE_VTH = True  # Calculate Vth using three methods
-    ANALYZE_SS = True  # Calculate Subthreshold Swing
-    ANALYZE_MOBILITY = True  # Calculate field-effect Mobility
+    ANALYZE_VTH: bool = True  # Calculate Vth using three methods
+    ANALYZE_SS: bool = True  # Calculate Subthreshold Swing
+    ANALYZE_MOBILITY: bool = True  # Calculate field-effect Mobility
     
-    DENOISE_CURRENT = False  # NOT recommended: denoise I_d for calculating mobility
-    REMOVE_OUTLIERS = True  # Remove outliers from data
+    DENOISE_CURRENT: bool = False  # NOT recommended: denoise I_d for calculating mobility
+    REMOVE_OUTLIERS: bool = True  # Remove outliers from data
     
-    DIFFERENTIAL_ROUGHNESS = 2  # (1~4) recommended
-    LOG_THRESHOLD_FIND_SS = 1.2  # (1.1~2) recommended for Subthreshold Swing calculation
+    DIFFERENTIAL_ROUGHNESS: int = 2  # (1~4) recommended
+    LOG_THRESHOLD_FIND_SS: float = 1.2  # (1.1~2) recommended for Subthreshold Swing calculation
 
 ################################################################################################
 
 from datetime import datetime
-start_time = datetime.now().strftime("%H-%M-%S_%Y%m%d")
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-plt.rcParams['figure.dpi'] = 120
 import xlrd
 from scipy.constants import epsilon_0
 from scipy import interpolate
@@ -91,13 +89,17 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.stats import linregress
 from scipy.interpolate import UnivariateSpline
 import traceback
-DEBUG = False
+from typing import List, Union, Tuple
+
+start_time: str = datetime.now().strftime("%H-%M-%S_%Y%m%d")
+plt.rcParams['figure.dpi'] = 120
+DEBUG: bool = False
 
 if True:
-    directory = './Debug/' if DEBUG else f'./result/TransferCurve/{SERIES_NAME}_{DATA_FILE}_{start_time}/'
+    directory: str = './Debug/' if DEBUG else f'./result/TransferCurve/{SERIES_NAME}_{DATA_FILE}_{start_time}/'
     os.makedirs(directory, exist_ok=True)
     if not DEBUG:
-        backup_path = os.path.join(directory, 'code_backup.py')
+        backup_path: str = os.path.join(directory, 'code_backup.py')
         with open(__file__, 'r', encoding='utf-8') as src, \
             open(backup_path, 'w', encoding='utf-8') as dst:
             dst.write(src.read())
@@ -110,7 +112,7 @@ if True:   ### prepare for data analysis ###
             CONDITION_FILE = './' + CONDITION_FILE
             condition_workbook = xlrd.open_workbook(CONDITION_FILE)
             condition_sheet = condition_workbook.sheet_by_name('Conditions')
-            condition_list = []
+            condition_list: List[List[float]] = []
             for row in range(1,condition_sheet.nrows):
                 row_data = condition_sheet.row_values(row, 1, 4)
                 condition_list.append(row_data)
@@ -120,23 +122,23 @@ if True:   ### prepare for data analysis ###
             CONDITION_DATA = False
             print('Condition file not found (using manual input)\n CH_WIDTH, CH_LENGTH, GI_THICK')
             
-    workbook = xlrd.open_workbook(DATA_FILE)
-    sheet_names = workbook.sheet_names()
-    data_names = sheet_names[:1]+sheet_names[3:]
-    settings_sheet = workbook.sheet_by_name('Settings')
-    settings_df = pd.DataFrame([settings_sheet.row_values(i) for i in range(settings_sheet.nrows)])
+    workbook: xlrd.Book = xlrd.open_workbook(DATA_FILE)
+    sheet_names: List[str] = workbook.sheet_names()
+    data_names: List[str] = sheet_names[:1]+sheet_names[3:]
+    settings_sheet: xlrd.sheet.Sheet = workbook.sheet_by_name('Settings')
+    settings_df: pd.DataFrame = pd.DataFrame([settings_sheet.row_values(i) for i in range(settings_sheet.nrows)])
     data_name_indicies = settings_df[settings_df[0].isin(sheet_names)].index
     dividing_indicies = settings_df[settings_df[0].isin(['=================================='])].index
     start_dividing_index = dividing_indicies[0::2]
     name_dividing_index = dividing_indicies[1::2]
     
-    settings_list = []
+    settings_list: List[np.ndarray] = []
     for i in range(len(data_names)):
         if data_names[i] == settings_df.iloc[data_name_indicies[i], 0]:
             if i < len(data_names)-1:
-                selected_data = settings_df.iloc[start_dividing_index[i]:start_dividing_index[i+1], 0:4].values
+                selected_data: np.ndarray = settings_df.iloc[start_dividing_index[i]:start_dividing_index[i+1], 0:4].values
             else:
-                selected_data = settings_df.iloc[start_dividing_index[i]:, 0:4].values
+                selected_data: np.ndarray = settings_df.iloc[start_dividing_index[i]:, 0:4].values
         else:
             raise ValueError('data name not matching')
         settings_list.append(selected_data)
@@ -146,86 +148,71 @@ if True:   ### prepare for data analysis ###
     if len(settings_list) != len(data_names):
         raise ValueError('some data missing')
     
-    drainI_list = []
+    drainI_list: List[np.ndarray] = []
     # drainV_list = []
-    gateI_list = []
-    gateV_list = []
+    gateI_list: List[np.ndarray] = []
+    gateV_list: List[np.ndarray] = []
     for i in range(len(data_names)):
-        sheet_i = workbook.sheet_by_name(data_names[i])
-        data_i = []
+        sheet_i: xlrd.sheet.Sheet = workbook.sheet_by_name(data_names[i])
+        data_i: List[List[Union[str, float]]] = []
         for row_idx in range(sheet_i.nrows):
             row = sheet_i.row_values(row_idx)
             data_i.append(row)
-        data_i = np.array(data_i)
-        I_d_i = np.array(data_i)[1:,data_i[0,:] == 'DrainI'].astype(float)
+        data_i_np: np.ndarray = np.array(data_i)
+        I_d_i: np.ndarray = data_i_np[1:,data_i_np[0,:] == 'DrainI'].astype(float)
         drainI_list.append(I_d_i)
-        I_g_i = np.array(data_i)[1:,data_i[0,:] == 'GateI'].astype(float)
+        I_g_i: np.ndarray = data_i_np[1:,data_i_np[0,:] == 'GateI'].astype(float)
         gateI_list.append(I_g_i)
         # V_d_i = np.array(data_i)[1:,1]
         # drainV_list.append(V_d_i)
-        V_g_i = np.array(data_i)[1:,data_i[0,:] == 'GateV'].astype(float)
+        V_g_i: np.ndarray = data_i_np[1:,data_i_np[0,:] == 'GateV'].astype(float)
         gateV_list.append(V_g_i)
         del sheet_i, data_i, I_d_i,I_g_i, V_g_i #, V_d_i
         
-    transfercurve_list = []
-    subthresholdswing_list = []
-    mobilityFE_list = []
-    mobilitySat_list = []
-    error_files_list = []
-    result_list = [['name', 'Drain Voltage', 'Vth_current', 'Vth_interpol', 'Vth_logderivative', 'onoff ratio', 'Subthreshold Swing', 'u_FE(max)']]
+    transfercurve_list: List[np.ndarray] = []
+    subthresholdswing_list: List[np.ndarray] = []
+    mobilityFE_list: List[np.ndarray] = []
+    mobilitySat_list: List[np.ndarray] = []
+    error_files_list: List[str] = []
+    result_list: List[List[Union[str, float]]] = [['name', 'Drain Voltage', 'Vth_current', 'Vth_interpol', 'Vth_logderivative', 'onoff ratio', 'Subthreshold Swing', 'u_FE(max)']]
     
-    gi_eps = GI_EPS_R *epsilon_0 *1e-2  # Permitivity of GI (F/cm)
+    gi_eps: float = GI_EPS_R *epsilon_0 *1e-2  # Permitivity of GI (F/cm)
 
 if True:   ### pre-define functions for data analysis ###
-    def lowpass_window(data, window_size=15):
+    def lowpass_window(data: np.ndarray, window_size: int = 15) -> np.ndarray:
         return np.convolve(data, np.ones(window_size) / window_size, mode='valid')
     
-    def check_monotonic(array):
-        differences = np.diff(array)
-        is_increasing = np.all(differences >= 0)
-        is_decreasing = np.all(differences <= 0)
+    def check_monotonic(array: np.ndarray) -> int:
+        differences: np.ndarray = np.diff(array)
+        is_increasing: bool = np.all(differences >= 0)
+        is_decreasing: bool = np.all(differences <= 0)
         if is_increasing:
             return 1
         elif is_decreasing:
             return -1
         else:
             return 0
-    
-    # def split_by_trend(arr):
-    #     if len(arr) < 2:
-    #         return [arr]
-    #     trends = np.sign(np.diff(arr))
-    #     segments = []
-    #     start = 0
-    #     for i in range(1, len(trends)):
-    #         if trends[i] != trends[i - 1]:
-    #             segments.append(arr[start:i+1])
-    #             start = i
-    #     segments.append(arr[start:])
-    #     return segments
 
-    def get_segment_indices(arr, n=-1):
+    def get_segment_indices(arr: np.ndarray, n: int = -1) -> np.ndarray:
         if len(arr) < 2:
             return np.array([0]) if len(arr) > 0 else np.array([])
 
-        trends = np.sign(np.diff(arr))
-        indices = []
-        start = 0
-        i = 0
+        trends: np.ndarray = np.sign(np.diff(arr))
+        indices: List[np.ndarray] = []
+        start: int = 0
+        i: int = 0
 
         while i < len(trends):
-            # flat(0) 건너뛰기
             if trends[i] == 0:
                 i += 1
                 start = i
                 continue
-            # 현재 방향 유지되는 동안 진행
-            direction = trends[i]
-            j = i + 1
+            direction: int = trends[i]
+            j: int = i + 1
             while j < len(trends) and trends[j] == direction:
                 j += 1
-            end = j
-            indices.append(np.arange(start, end + 1))  # arr 인덱스 기준
+            end: int = j
+            indices.append(np.arange(start, end + 1))
             i = j
             start = j
 
@@ -237,18 +224,18 @@ if True:   ### pre-define functions for data analysis ###
             raise ValueError(f"n too big. (0 <= n <= {len(indices)-1})")
         
     
-    def interpolate_large_gaps(data, step, donot_interpolate=False):
+    def interpolate_large_gaps(data: Union[List[float], np.ndarray], step: float, donot_interpolate: bool = False) -> Union[List[float], np.ndarray]:
         data = np.array(data)
         if step <= 0:
             donot_interpolate = True
         if donot_interpolate:
             return data.tolist()
-        interpolated_data = [data[0]]
+        interpolated_data: List[float] = [data[0]]
         for i in range(1, len(data)):
-            gap = data[i] - interpolated_data[-1]
+            gap: float = data[i] - interpolated_data[-1]
             if gap > step:
-                num_elements = int(np.ceil(gap / step)) - 1
-                interpolated_values = [
+                num_elements: int = int(np.ceil(gap / step)) - 1
+                interpolated_values: List[float] = [
                     interpolated_data[-1] + step * j
                     for j in range(1, num_elements + 1)
                 ]
@@ -256,14 +243,14 @@ if True:   ### pre-define functions for data analysis ###
             interpolated_data.append(data[i])
         return np.array(interpolated_data)
     
-    def find_nonzero_region(indices):
-        _start = indices[0]
-        _end = indices[0]
-        current_start = indices[0]
-        max_length = 0
+    def find_nonzero_region(indices: np.ndarray) -> Tuple[int, int]:
+        _start: int = indices[0]
+        _end: int = indices[0]
+        current_start: int = indices[0]
+        max_length: int = 0
         for i in range(1, len(indices)):
             if indices[i] != indices[i-1] + 1:
-                current_length = indices[i-1] - current_start + 1
+                current_length: int = indices[i-1] - current_start + 1
                 if current_length > max_length:
                     max_length = current_length
                     _start = current_start
@@ -280,28 +267,28 @@ if True:   ### data analysis (calculate each single datasheet) ###
         print('\n\n**** ==== **** ==== ****\nProcessing data:',data_names[i])
         
         try :
-            CalculateVth = ANALYZE_VTH
-            CalculateSS = ANALYZE_SS
-            CalculateMobility = ANALYZE_MOBILITY
+            CalculateVth: bool = ANALYZE_VTH
+            CalculateSS: bool = ANALYZE_SS
+            CalculateMobility: bool = ANALYZE_MOBILITY
             
             ###################################
             if CONDITION_DATA:
                 CH_WIDTH = float(condition_list[i][0])
                 CH_LENGTH = float(condition_list[i][1])
                 GI_THICK = float(condition_list[i][2])
-                gi_thick_cm = GI_THICK *1e-4
+                gi_thick_cm: float = GI_THICK *1e-4
                 DEVICE_TYPE = str(condition_list[i][3])
             else:
-                gi_thick_cm = GI_THICK *1e-4  # cm
-            gi_cap = gi_eps /gi_thick_cm #F/cm^2
+                gi_thick_cm: float = GI_THICK *1e-4  # cm
+            gi_cap: float = gi_eps /gi_thick_cm #F/cm^2
             
-            name = data_names[i]
-            setting = settings_list[i]
+            name: str = data_names[i]
+            setting: np.ndarray = settings_list[i]
             # I_d = np.abs(drainI_list[i].astype(float)).flatten()
             # I_g = np.abs(gateI_list[i].astype(float)).flatten()
-            I_d = np.array(drainI_list[i].astype(float)).flatten()
-            I_g = np.array(gateI_list[i].astype(float)).flatten()
-            V_g = np.array(gateV_list[i].astype(float)).flatten()
+            I_d: np.ndarray = np.array(drainI_list[i].astype(float)).flatten()
+            I_g: np.ndarray = np.array(gateI_list[i].astype(float)).flatten()
+            V_g: np.ndarray = np.array(gateV_list[i].astype(float)).flatten()
             
             if check_monotonic(V_g) >0:
                 print('Positive single sweep')
@@ -313,8 +300,8 @@ if True:   ### data analysis (calculate each single datasheet) ###
             else:
                 print('Not a single sweep')
                 if CalculateVth == True or CalculateSS == True or CalculateMobility == True:
-                    seg_num = 1   # 0 means longest segment-1
-                    idx_anl = get_segment_indices(V_g, n=seg_num)  
+                    seg_num: int = 1   # 0 means longest segment-1
+                    idx_anl: np.ndarray = get_segment_indices(V_g, n=seg_num)  
                     I_d = I_d[idx_anl]
                     I_g = I_g[idx_anl]
                     V_g = V_g[idx_anl]
@@ -334,19 +321,19 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 error_files_list.append(name)
                 continue
             
-            step_row = np.where(setting[:,0] == 'Step')[0][0]
-            terminal_row = np.where(setting[:,0] == 'Device Terminal')[0][0]
-            gate_col = np.where(setting[terminal_row,:] == 'Gate')[0][0]
-            drain_col = np.where(setting[terminal_row,:] == 'Drain')[0][0]
-            bias_row = np.where(setting[:,0] == 'Start/Bias')[0][0]
+            step_row: int = np.where(setting[:,0] == 'Step')[0][0]
+            terminal_row: int = np.where(setting[:,0] == 'Device Terminal')[0][0]
+            gate_col: int = np.where(setting[terminal_row,:] == 'Gate')[0][0]
+            drain_col: int = np.where(setting[terminal_row,:] == 'Drain')[0][0]
+            bias_row: int = np.where(setting[:,0] == 'Start/Bias')[0][0]
             
             if (setting[step_row, gate_col]) != 'N/A':
-                V_g_step = float(setting[step_row, gate_col])
+                V_g_step: float = float(setting[step_row, gate_col])
             else:
-                V_g_step = False
+                V_g_step: bool = False
             try:
                 if (setting[step_row, drain_col]) == 'N/A':
-                    V_d = float(setting[bias_row, drain_col])
+                    V_d: float = float(setting[bias_row, drain_col])
                 else:
                     raise ValueError('Drain Voltage not constant(: not a transfer curve)')
             except ValueError as error:
@@ -380,8 +367,8 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     ax2.set_ylim(ID_MIN, ID_MAX)
                 else:
                     ax1.set_xlim(V_g.min(), V_g.max())
-                    ymin = min(I_d.min(), I_g.min()) * 1e-1
-                    ymax = max(I_d.max(), I_g.max()) * 1e+1
+                    ymin: float = min(I_d.min(), I_g.min()) * 1e-1
+                    ymax: float = max(I_d.max(), I_g.max()) * 1e+1
                     if ymin <= 0:
                         ymin = 1e-12
                     ax1.set_ylim(ymin, ymax)
@@ -395,36 +382,36 @@ if True:   ### data analysis (calculate each single datasheet) ###
             
             ###################################
             if CalculateVth or CalculateSS or CalculateMobility:
-                Vg_step_interpolate = 0.2
+                Vg_step_interpolate: float = 0.2
                 
                 I_d = np.abs(I_d)
                 I_g = np.abs(I_g)
                 
-                spline = UnivariateSpline(V_g, I_d, s=0)
-                spline_log = UnivariateSpline(V_g, np.log(I_d), s=0)
+                spline: UnivariateSpline = UnivariateSpline(V_g, I_d, s=0)
+                spline_log: UnivariateSpline = UnivariateSpline(V_g, np.log(I_d), s=0)
                 
                 if np.diff(V_g).max() >= Vg_step_interpolate and Vg_step_interpolate > 0:
-                    V_g_fine = interpolate_large_gaps(V_g, Vg_step_interpolate)
+                    V_g_fine: np.ndarray = interpolate_large_gaps(V_g, Vg_step_interpolate)
                     print('interpolated with {}V'.format(Vg_step_interpolate))
                 elif Vg_step_interpolate < 0:
                     raise ValueError('Vg_step_interpolate should be positive')
                 else:
-                    V_g_fine = np.array(V_g)
+                    V_g_fine: np.ndarray = np.array(V_g)
                     print('no interpolation')
-                I_d_fine = spline(V_g_fine)
-                log_I_d_fine = spline_log(V_g_fine)
+                I_d_fine: np.ndarray = spline(V_g_fine)
+                log_I_d_fine: np.ndarray = spline_log(V_g_fine)
                 
                 if DEVICE_TYPE == 'n':
-                    d_log_I_d_dV_g_fine = np.gradient(log_I_d_fine, V_g_fine)
+                    d_log_I_d_dV_g_fine: np.ndarray = np.gradient(log_I_d_fine, V_g_fine)
                     d_log_I_d_dV_g_fine = np.where(d_log_I_d_dV_g_fine > 0, d_log_I_d_dV_g_fine, 1e-12)
                 elif DEVICE_TYPE == 'p':
-                    d_log_I_d_dV_g_fine = np.gradient(log_I_d_fine, V_g_fine)*-1
+                    d_log_I_d_dV_g_fine: np.ndarray = np.gradient(log_I_d_fine, V_g_fine)*-1
                     d_log_I_d_dV_g_fine = np.where(d_log_I_d_dV_g_fine > 0, d_log_I_d_dV_g_fine, 1e-12)
                 
                 if DEVICE_TYPE == 'n':
-                    subthreshold_indices = np.where(np.log10(d_log_I_d_dV_g_fine +1e-9) >= (LOG_THRESHOLD_FIND_SS)*-1)[0]
+                    subthreshold_indices: np.ndarray = np.where(np.log10(d_log_I_d_dV_g_fine +1e-9) >= (LOG_THRESHOLD_FIND_SS)*-1)[0]
                 elif DEVICE_TYPE == 'p':
-                    subthreshold_indices = np.where(np.log10(d_log_I_d_dV_g_fine +1e-9) >= (LOG_THRESHOLD_FIND_SS)*-1)[0]
+                    subthreshold_indices: np.ndarray = np.where(np.log10(d_log_I_d_dV_g_fine +1e-9) >= (LOG_THRESHOLD_FIND_SS)*-1)[0]
                 
                 if len(subthreshold_indices) == 0:
                     error_files_list.append(name+' (subthreshold_indices = 0)')
@@ -432,7 +419,7 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     continue
                 
                 if DEBUG:
-                    def plot_d_log_I_d(V_g_fine, d_log_I_d_dV_g_fine):        # for debugging & parameter tuning
+                    def plot_d_log_I_d(V_g_fine: np.ndarray, d_log_I_d_dV_g_fine: np.ndarray) -> None:        # for debugging & parameter tuning
                         plt.figure(figsize=(8, 5))
                         plt.plot(V_g_fine, d_log_I_d_dV_g_fine, marker='o', linestyle='-', color='b', label='d_log(I_d) / dV_g')
                         plt.xlabel('V_g_fine (V)', fontsize=12)
@@ -444,7 +431,8 @@ if True:   ### data analysis (calculate each single datasheet) ###
                         plt.show()
                         plt.figure(figsize=(8, 5))
                         plt.plot(V_g_fine, np.log10(d_log_I_d_dV_g_fine +1e-9), marker='o', linestyle='-', color='r', label='d_log(I_d) / dV_g')
-                        plt.axhline(LOG_THRESHOLD_FIND_SS*-1, color='r', linestyle='--', linewidth=1.5, label=f'LOG_THRESHOLD_FIND_SS = {(LOG_THRESHOLD_FIND_SS*-1)}')
+                        plt.axhline(LOG_THRESHOLD_FIND_SS*-1, color='r', linestyle='--', linewidth=1.5, label=f'LOG_THRESHOLD_FIND_SS = {(LOG_THRESHOLD_FIND_SS*-1)}'
+)
                         plt.xlabel('V_g_fine (V)', fontsize=12)
                         plt.ylabel('log--d log(I_d) / dV_g', fontsize=12)
                         plt.title('Subthreshold Slope (d log(I_d) / dV_g vs V_g)', fontsize=14)
@@ -456,28 +444,28 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 
                 ss_start, ss_end = find_nonzero_region(subthreshold_indices)
                 
-                V_g_fine_cut = V_g_fine[ss_start:ss_end]
-                I_d_fine_cut = I_d_fine[ss_start:ss_end]
-                d_log_I_d_dV_g_cut = d_log_I_d_dV_g_fine[ss_start:ss_end]
+                V_g_fine_cut: np.ndarray = V_g_fine[ss_start:ss_end]
+                I_d_fine_cut: np.ndarray = I_d_fine[ss_start:ss_end]
+                d_log_I_d_dV_g_cut: np.ndarray = d_log_I_d_dV_g_fine[ss_start:ss_end]
                 print('\n------ *** -----\nV_d:', V_d)
 
             
             if CalculateVth:
-                vth_current = np.round(np.interp(ID_AT_VTH, I_d, V_g, left=np.nan, right=np.nan), 3)
+                vth_current: float = np.round(np.interp(ID_AT_VTH, I_d, V_g, left=np.nan, right=np.nan), 3)
 
-                step_base = Vg_step_interpolate if Vg_step_interpolate > 0 else (V_g_step if V_g_step else np.diff(V_g).min())
-                window_size = int(LINEAR_WINDOW_FOR_VTH / step_base)
+                step_base: float = Vg_step_interpolate if Vg_step_interpolate > 0 else (V_g_step if V_g_step else np.diff(V_g).min())
+                window_size: int = int(LINEAR_WINDOW_FOR_VTH / step_base)
 
-                offset = int(3 / step_base)
+                offset: int = int(3 / step_base)
                 if DEVICE_TYPE == 'n':
-                    safe_end = min(ss_end + offset, len(V_g_fine) - 1)
-                    valid_indices = np.where(
+                    safe_end: int = min(ss_end + offset, len(V_g_fine) - 1)
+                    valid_indices: np.ndarray = np.where(
                         (V_g_fine >= V_g_fine[ss_start]) &
                         (V_g_fine <= V_g_fine[safe_end])
                     )[0]
                 elif DEVICE_TYPE == 'p':
-                    safe_start = max(ss_start - offset, 0)
-                    valid_indices = np.where(
+                    safe_start: int = max(ss_start - offset, 0)
+                    valid_indices: np.ndarray = np.where(
                         (V_g_fine <= V_g_fine[ss_end]) &
                         (V_g_fine >= V_g_fine[safe_start])
                     )[0]
@@ -488,32 +476,32 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     continue
 
                 search_start, search_end = valid_indices[0], valid_indices[-1]
-                max_corr = 0
-                best_start = search_start
+                max_corr: float = 0
+                best_start: int = search_start
                 for start in range(search_start, search_end):
-                    end = start + window_size
+                    end: int = start + window_size
                     if end > len(V_g_fine):  # 범위 초과 방지
                         break
-                    V_g_window = V_g_fine[start:end]
-                    I_d_window = I_d_fine[start:end]
+                    V_g_window: np.ndarray = V_g_fine[start:end]
+                    I_d_window: np.ndarray = I_d_fine[start:end]
                     slope, intercept, r_value, _, _ = linregress(V_g_window, I_d_window)
-                    corr = abs(r_value)
+                    corr: float = abs(r_value)
                     if corr > max_corr:
                         max_corr = corr
                         best_start = start
 
-                linear_region_mask = np.zeros_like(V_g_fine, dtype=bool)
+                linear_region_mask: np.ndarray = np.zeros_like(V_g_fine, dtype=bool)
                 linear_region_mask[best_start:best_start + window_size] = True
-                V_g_linear = V_g_fine[linear_region_mask]
-                I_d_linear = I_d_fine[linear_region_mask]
+                V_g_linear: np.ndarray = V_g_fine[linear_region_mask]
+                I_d_linear: np.ndarray = I_d_fine[linear_region_mask]
 
                 slope, intercept, _, _, _ = linregress(V_g_linear, I_d_linear)
-                vth_interpol = np.round(-intercept / slope, 3)
+                vth_interpol: float = np.round(-intercept / slope, 3)
 
-                max_slope_index_fine = np.argmax(d_log_I_d_dV_g_cut)
-                vth_logderivative = np.round(V_g_fine_cut[max_slope_index_fine], 3)
+                max_slope_index_fine: int = np.argmax(d_log_I_d_dV_g_cut)
+                vth_logderivative: float = np.round(V_g_fine_cut[max_slope_index_fine], 3)
 
-                onoff_ratio = np.max(np.abs(I_d_fine)) / np.min(np.abs(I_d_fine))
+                onoff_ratio: float = np.max(np.abs(I_d_fine)) / np.min(np.abs(I_d_fine))
 
                 print(f"\nvth_current(at {ID_AT_VTH}A): {vth_current} V")
                 print(f"vth_interpol: {vth_interpol} V")
@@ -527,13 +515,13 @@ if True:   ### data analysis (calculate each single datasheet) ###
 
             
             if CalculateSS:
-                SS_values = 1000 / d_log_I_d_dV_g_fine
-                SS_values_cut = SS_values[ss_start:ss_end]
-                SS_values_cut_sorted = np.sort(SS_values_cut)
-                min_over_60 = SS_values_cut_sorted[SS_values_cut_sorted >= 60][0]
-                results = SS_values_cut_sorted[SS_values_cut_sorted <= min_over_60]
-                subthreshold_swings = np.round(results,3)
-                subthreshold_swing = np.max(subthreshold_swings)
+                SS_values: np.ndarray = 1000 / d_log_I_d_dV_g_fine
+                SS_values_cut: np.ndarray = SS_values[ss_start:ss_end]
+                SS_values_cut_sorted: np.ndarray = np.sort(SS_values_cut)
+                min_over_60: float = SS_values_cut_sorted[SS_values_cut_sorted >= 60][0]
+                results: np.ndarray = SS_values_cut_sorted[SS_values_cut_sorted <= min_over_60]
+                subthreshold_swings: np.ndarray = np.round(results,3)
+                subthreshold_swing: float = np.max(subthreshold_swings)
                 print('\nsubthreshold_swings: {} (mV/dec)'.format(subthreshold_swings))
                 print('subthreshold_swing (over 60): {} (mV/dec)'.format(subthreshold_swing))
             else:
@@ -542,56 +530,56 @@ if True:   ### data analysis (calculate each single datasheet) ###
             if CalculateMobility:
                 
                 if DENOISE_CURRENT:
-                    I_d_rough = gaussian_filter1d(I_d_fine, 1)
-                    V_g_rough = V_g_fine
+                    I_d_rough: np.ndarray = gaussian_filter1d(I_d_fine, 1)
+                    V_g_rough: np.ndarray = V_g_fine
                     fx_roughen = interpolate.interp1d(V_g_rough,I_d_rough,kind='cubic')
                     V_g_rough = np.arange(np.min(V_g_rough),np.max(V_g_fine),DIFFERENTIAL_ROUGHNESS)
                     I_d_rough = fx_roughen(V_g_rough)
                     print('Roughened with {}V'.format(DIFFERENTIAL_ROUGHNESS))
-                    roughspline = UnivariateSpline(V_g_rough, I_d_rough, s=0)   #hyperparameter
+                    roughspline: UnivariateSpline = UnivariateSpline(V_g_rough, I_d_rough, s=0)   #hyperparameter
                     V_g_rough = np.arange(V_g_rough.min(), V_g_rough.max(), 1)
                     I_d_rough = roughspline(V_g_rough)
                 else:
-                    V_g_rough = V_g_fine
-                    I_d_rough = I_d_fine
+                    V_g_rough: np.ndarray = V_g_fine
+                    I_d_rough: np.ndarray = I_d_fine
                     print('no roughening')
                 
-                g_m = np.abs(np.gradient(I_d_rough, V_g_rough))  # dI_d/dV_g
+                g_m: np.ndarray = np.abs(np.gradient(I_d_rough, V_g_rough))  # dI_d/dV_g
                 
                 if REMOVE_OUTLIERS:
-                    threshold = np.max(g_m)*5e-2     #hyperparameter
-                    spline_gm = UnivariateSpline(V_g_rough, g_m, s=np.max((g_m)*5e-6))     #hyperparameter    
-                    diff = np.abs(g_m - spline_gm(V_g_rough))
-                    outliers = diff > threshold
+                    threshold: float = np.max(g_m)*5e-2     #hyperparameter
+                    spline_gm: UnivariateSpline = UnivariateSpline(V_g_rough, g_m, s=np.max((g_m)*5e-6))     #hyperparameter    
+                    diff: np.ndarray = np.abs(g_m - spline_gm(V_g_rough))
+                    outliers: np.ndarray = diff > threshold
                     g_m = g_m[~outliers]
                     V_g_rough = V_g_rough[~outliers]
                     I_d_rough = I_d_rough[~outliers]
                 
                 if DEVICE_TYPE == 'n':
-                    mu_linear = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * g_m
-                    mu_eff = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (I_d_rough / (V_g_rough - vth_interpol))
-                    mu_sat = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (2 * I_d_rough / (V_g_rough - vth_interpol) ** 2)
+                    mu_linear: np.ndarray = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * g_m
+                    mu_eff: np.ndarray = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (I_d_rough / (V_g_rough - vth_interpol))
+                    mu_sat: np.ndarray = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (2 * I_d_rough / (V_g_rough - vth_interpol) ** 2)
 
-                    cond_indices = np.where(V_g_rough > V_g_fine[ss_end])[0]
+                    cond_indices: np.ndarray = np.where(V_g_rough > V_g_fine[ss_end])[0]
                     if cond_indices.size == 0:
                         print("[Mobility calc - n-type] No saturation region found (V_g_rough > V_g_fine[ss_end])")
-                        idx_sat_reigion = None
+                        idx_sat_reigion: Union[int, None] = None
                     else:
-                        idx_sat_reigion = cond_indices[0]
+                        idx_sat_reigion: Union[int, None] = cond_indices[0]
 
                 elif DEVICE_TYPE == 'p':
-                    mu_linear = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * np.abs(g_m)
-                    mu_eff = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (I_d_rough / np.abs(V_g_rough - vth_interpol))
-                    mu_sat = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (2 * I_d_rough / (V_g_rough - vth_interpol) ** 2)
+                    mu_linear: np.ndarray = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * np.abs(g_m)
+                    mu_eff: np.ndarray = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (I_d_rough / np.abs(V_g_rough - vth_interpol))
+                    mu_sat: np.ndarray = (CH_LENGTH / (CH_WIDTH * gi_cap * V_d)) * (2 * I_d_rough / (V_g_rough - vth_interpol) ** 2)
 
-                    cond_indices = np.where(V_g_rough > V_g_fine[ss_start])[0]
+                    cond_indices: np.ndarray = np.where(V_g_rough > V_g_fine[ss_start])[0]
                     if cond_indices.size == 0:
                         print("[Mobility calc - p-type] No saturation region found (V_g_rough > V_g_fine[ss_start])")
-                        idx_sat_reigion = None
+                        idx_sat_reigion: Union[int, None] = None
                     else:
-                        idx_sat_reigion = cond_indices[0]
+                        idx_sat_reigion: Union[int, None] = cond_indices[0]
                 
-                max_mu_linear = np.max(mu_linear)
+                max_mu_linear: float = np.max(mu_linear)
                 
                 print("\nu_FE(max): ", np.round(max_mu_linear,3))
             else:
@@ -604,8 +592,8 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     axs[0, 0].plot(V_g, I_d, label='Drain Current ($I_d$)', color='blue')
                     axs[0, 0].plot(V_g_linear, I_d_linear, 'o', label='Linear Region', color='orange', alpha=0.3)
                     axs[0, 0].axvline(vth_interpol, color='green', linestyle='--', label=f'Threshold Voltage ($V_th$): {vth_interpol:.2f} V')
-                    V_g_extrap = np.linspace(vth_interpol, V_g_linear.max(), 10)
-                    I_d_extrap = slope * V_g_extrap + intercept
+                    V_g_extrap: np.ndarray = np.linspace(vth_interpol, V_g_linear.max(), 10)
+                    I_d_extrap: np.ndarray = slope * V_g_extrap + intercept
                     axs[0, 0].plot(V_g_extrap, I_d_extrap, color='red', linestyle='--', label='Extrapolated Line')
                     axs[0, 0].set_xlabel("Gate Voltage ($V_g$) [V]")
                     axs[0, 0].set_ylabel("Drain Current ($I_d$) [A]")
@@ -636,8 +624,8 @@ if True:   ### data analysis (calculate each single datasheet) ###
                     axs[1, 0].grid(True)
                     # axs[1, 1].plot(V_g_fine_cut, d_log_I_d_dV_g_cut, label=r'$\log_{10}(I_d)$', color='purple')
                     # axs[1, 1].set_xlabel("Gate Voltage ($V_g$) [V]")
-                    # axs[1, 1].set_ylabel(r"$\log_{10}(I_d)$")
-                    # axs[1, 1].set_title(r"$\log_{10}(I_d)$ vs ($V_g$) Cut")
+                    # axs[1, 1].set_ylabel(r'$\log_{10}(I_d)$')
+                    # axs[1, 1].set_title(r'$\log_{10}(I_d)$ vs ($V_g$) Cut')
                     # axs[1, 1].legend()
                     # axs[1, 1].grid(True)
                     axs[1, 1].plot(V_g_fine_cut, SS_values_cut, label='SS', color='blue')
@@ -713,25 +701,25 @@ if True:   ### data analysis (calculate each single datasheet) ###
                 np.savetxt(directory + 'results.csv', np.array(result_list), delimiter=',', fmt='%s')
             
             if PLOTTING:
-                _transfercurve = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.array([V_g, I_d], dtype=float).T)).T
+                _transfercurve: np.ndarray = np.vstack((np.array([['V_g-TC', name]], dtype=str), np.array([V_g, I_d], dtype=float).T)).T
                 transfercurve_list.extend(_transfercurve)
-                TC_maxlength = max(len(arr) for arr in transfercurve_list)
-                transfercurve_save = np.array([np.pad(arr, (0, TC_maxlength - len(arr)), 'constant') for arr in transfercurve_list]).T
+                TC_maxlength: int = max(len(arr) for arr in transfercurve_list)
+                transfercurve_save: np.ndarray = np.array([np.pad(arr, (0, TC_maxlength - len(arr)), 'constant') for arr in transfercurve_list]).T
             np.savetxt(directory + 'TransferCurve.csv', transfercurve_save, delimiter=',', fmt='%s')
             if CalculateVth:
-                _subthresholdswing = np.vstack((np.array([['V_g-SS', name]], dtype=str), np.round(np.array([V_g_fine_cut, SS_values_cut], dtype=float),6).T)).T
+                _subthresholdswing: np.ndarray = np.vstack((np.array([['V_g-SS', name]], dtype=str), np.round(np.array([V_g_fine_cut, SS_values_cut], dtype=float),6).T)).T
                 subthresholdswing_list.extend(_subthresholdswing)
-                SS_maxlength = max(len(arr) for arr in subthresholdswing_list)
-                subthresholdswing_save = np.array([np.pad(arr, (0, SS_maxlength - len(arr)), 'constant') for arr in subthresholdswing_list]).T
+                SS_maxlength: int = max(len(arr) for arr in subthresholdswing_list)
+                subthresholdswing_save: np.ndarray = np.array([np.pad(arr, (0, SS_maxlength - len(arr)), 'constant') for arr in subthresholdswing_list]).T
                 np.savetxt(directory + 'SubthresholdSwing.csv', subthresholdswing_save, delimiter=',', fmt='%s')
             if CalculateMobility:
-                _mobilityFE = np.vstack((np.array([['V_g-u_FE', name]], dtype=str), np.round(np.array([V_g_rough, mu_linear], dtype=float),6).T)).T
+                _mobilityFE: np.ndarray = np.vstack((np.array([['V_g-u_FE', name]], dtype=str), np.round(np.array([V_g_rough, mu_linear], dtype=float),6).T)).T
                 mobilityFE_list.extend(_mobilityFE)
-                MF_maxlength = max(len(arr) for arr in mobilityFE_list)
-                mobilityFE_save = np.array([np.pad(arr, (0, MF_maxlength - len(arr)), 'constant') for arr in mobilityFE_list]).T
+                MF_maxlength: int = max(len(arr) for arr in mobilityFE_list)
+                mobilityFE_save: np.ndarray = np.array([np.pad(arr, (0, MF_maxlength - len(arr)), 'constant') for arr in mobilityFE_list]).T
                 np.savetxt(directory + 'MobilityFE.csv', mobilityFE_save, delimiter=',', fmt='%s')
             
-            def clear_variables():
+            def clear_variables() -> None:
                 for var in [
                     "V_g_rough", "V_g_fine", "I_d_fine", "log_I_d_fine", "d_log_I_d_dV_g_fine",
                     "subthreshold_indices", "V_g_linear", "I_d_linear", "I_d_rough", "g_m",
@@ -750,14 +738,14 @@ if True:   ### data analysis (calculate each single datasheet) ###
             error_files_list.append(name)
     
     if PLOTTING:
-        df = pd.read_csv(directory +'TransferCurve.csv', header=None, skiprows=1)
-        header_row = pd.read_csv(directory + 'TransferCurve.csv', header=None, nrows=1).values[0]
-        num_columns = df.shape[1]
+        df: pd.DataFrame = pd.read_csv(directory +'TransferCurve.csv', header=None, skiprows=1)
+        header_row: np.ndarray = pd.read_csv(directory + 'TransferCurve.csv', header=None, nrows=1).values[0]
+        num_columns: int = df.shape[1]
         plt.figure(figsize=(10, 6))
         for i in range(0, num_columns, 2):
-            x = df.iloc[:, i]
-            y = df.iloc[:, i + 1]
-            label = str(header_row[i + 1])
+            x: pd.Series = df.iloc[:, i]
+            y: pd.Series = df.iloc[:, i + 1]
+            label: str = str(header_row[i + 1])
             plt.plot(x, y, label=label)
         plt.xlabel('X-axis')
         plt.ylabel('Y-axis')
@@ -771,9 +759,9 @@ if True:   ### data analysis (calculate each single datasheet) ###
         
         plt.figure(figsize=(10, 6))
         for i in range(0, num_columns, 2):
-            x = df.iloc[:, i]
-            y = np.abs(df.iloc[:, i + 1])
-            label = str(header_row[i + 1])
+            x: pd.Series = df.iloc[:, i]
+            y: pd.Series = np.abs(df.iloc[:, i + 1])
+            label: str = str(header_row[i + 1])
             plt.plot(x, y, label=label)
         plt.xlabel('X-axis')
         plt.ylabel('Y-axis')
