@@ -12,16 +12,18 @@ Tested with: pandas, numpy, matplotlib, xlrd, scipy
 
 ###########################      user input      ############################
 
-DATA_FILE: str = 'TC_example1.xls'   # Path to the data file
+DATA_FILE: str = 'TR.xls'   # Path to the data file
 SERIES_NAME: str = 'test'        # Series name for saving results
-DEVICE_TYPE: str = 'n'               # 'n' for n-type FETs, 'p' for p-type FETs
+DEVICE_TYPE: str = 'p'               # 'n' for n-type FETs, 'p' for p-type FETs
 
 # === NEW: Header configuration (case-insensitive) ===
 # Fill these with the EXACT header texts in row 1 if your file differs.
 # Leave as None to auto-detect. (Defaults: DrainI, DrainV, GateV)
 CUSTOM_HEADERS = {
-    'Id': None,   # e.g., 'DrainI_A' or 'DrainI'
-    'Vg': None,   # e.g., 'GateV' or 'Gate V (V)'
+    'Id': 'DrainI'
+,   # e.g., 'DrainI_A' or 'DrainI'
+    'Vg': 'GateV'
+,   # e.g., 'GateV' or 'Gate V (V)'
     'Vd': None,   # e.g., 'DrainV' (optional)
     'Ig': None,   # e.g., 'GateI'  (optional)
 }
